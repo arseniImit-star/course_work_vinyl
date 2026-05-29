@@ -1,4 +1,3 @@
-// Marketplace.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { showNotification, getUserCollection } from '../api/api';
@@ -14,7 +13,6 @@ function Marketplace() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all');
 
-    // Форма создания объявления
     const [formData, setFormData] = useState({
         type: 'SALE',
         title: '',
@@ -46,11 +44,9 @@ function Marketplace() {
         setLoading(true);
         try {
             const response = await api.get('/marketplace/listings');
-            console.log('Загружены объявления:', response.data);
             setListings(response.data);
         } catch (error) {
             console.error('Ошибка загрузки объявлений:', error);
-            console.error('Детали:', error.response?.data);
             showNotification('❌ Ошибка загрузки объявлений', 'error');
         } finally {
             setLoading(false);
@@ -101,16 +97,6 @@ function Marketplace() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        console.log('Отправка данных:', {
-            userId: user.id,
-            type: formData.type,
-            title: formData.title,
-            description: formData.description,
-            vinylData: formData.selectedVinyl,
-            price: formData.price,
-            desiredRecords: formData.desiredRecords
-        });
-
         if (formData.type === 'SALE' && !formData.selectedVinyl) {
             showNotification('❌ Выберите пластинку из вашей коллекции', 'error');
             return;
@@ -129,7 +115,6 @@ function Marketplace() {
             };
 
             const response = await api.post('/marketplace/listings', listingData);
-            console.log('Ответ сервера:', response.data);
 
             if (response.data.success) {
                 showNotification('✅ Объявление создано!', 'success');
@@ -139,8 +124,7 @@ function Marketplace() {
             }
         } catch (error) {
             console.error('Ошибка создания:', error);
-            console.error('Детали ошибки:', error.response?.data);
-            showNotification(`❌ Ошибка при создании объявления: ${error.response?.data?.error || 'Неизвестная ошибка'}`, 'error');
+            showNotification(`❌ Ошибка при создании объявления`, 'error');
         } finally {
             setSubmitting(false);
         }
@@ -157,6 +141,22 @@ function Marketplace() {
             searchVinylQuery: ''
         });
         setVinylSearchResults([]);
+    };
+
+    const handleDelete = async (listingId, e) => {
+        e.stopPropagation();
+        try {
+            const response = await api.delete(`/marketplace/listings/${listingId}`);
+            if (response.data.success) {
+                showNotification('✅ Объявление удалено', 'success');
+                setListings(prev => prev.filter(l => l.id !== listingId));
+            } else {
+                showNotification('❌ Не удалось удалить объявление', 'error');
+            }
+        } catch (error) {
+            console.error('Ошибка удаления:', error);
+            showNotification('❌ Ошибка при удалении', 'error');
+        }
     };
 
     const getTypeIcon = (type) => {
@@ -194,18 +194,10 @@ function Marketplace() {
     };
 
     const startChat = (listing, e) => {
-        e.stopPropagation(); // Останавливаем всплытие, чтобы не открывалась детальная страница
+        e.stopPropagation();
         navigate(`/messages/${listing.userId}`, { state: { listing } });
     };
 
-    const filteredListings = listings.filter(listing => {
-        const matchesSearch = listing.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             listing.username?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = filterType === 'all' || listing.type === filterType;
-        return matchesSearch && matchesType;
-    });
-
-    // Рендер формы в зависимости от типа
     const renderFormFields = () => {
         switch(formData.type) {
             case 'SALE':
@@ -243,7 +235,6 @@ function Marketplace() {
                                 )}
                             </div>
                         </div>
-
                         <div className="form-group">
                             <label>💰 Цена (₽)</label>
                             <input
@@ -256,7 +247,6 @@ function Marketplace() {
                         </div>
                     </>
                 );
-
             case 'EXCHANGE':
                 return (
                     <>
@@ -270,7 +260,6 @@ function Marketplace() {
                                 required
                             />
                         </div>
-
                         <div className="form-group">
                             <label>🎵 Что предлагаете?</label>
                             <div className="collection-select">
@@ -305,75 +294,81 @@ function Marketplace() {
                         </div>
                     </>
                 );
-
             case 'SEARCH':
                 return (
-                    <div className="form-group">
-                        <label>🔍 Какую пластинку ищете?</label>
-                        <div className="vinyl-search">
-                            <input
-                                type="text"
-                                placeholder="Введите название пластинки или исполнителя..."
-                                value={formData.searchVinylQuery}
-                                onChange={(e) => setFormData({...formData, searchVinylQuery: e.target.value})}
-                            />
-                            <button type="button" onClick={searchVinylOnDiscogs} disabled={searchingVinyl}>
-                                {searchingVinyl ? 'Поиск...' : 'Найти на Discogs'}
-                            </button>
-                        </div>
-
-                        {vinylSearchResults.length > 0 && (
-                            <div className="vinyl-results">
-                                {vinylSearchResults.map(vinyl => (
-                                    <div key={vinyl.id} className="vinyl-result-item" onClick={() => selectVinyl(vinyl)}>
-                                        <img src={vinyl.coverImage || 'https://via.placeholder.com/50'} alt={vinyl.title} />
-                                        <div>
-                                            <div className="title">{vinyl.title}</div>
-                                            <div className="artist">{vinyl.artist}</div>
-                                        </div>
-                                    </div>
-                                ))}
+                    <>
+                        <div className="form-group">
+                            <label>🔍 Какую пластинку ищете?</label>
+                            <div className="vinyl-search">
+                                <input
+                                    type="text"
+                                    placeholder="Введите название пластинки или исполнителя..."
+                                    value={formData.searchVinylQuery}
+                                    onChange={(e) => setFormData({...formData, searchVinylQuery: e.target.value})}
+                                />
+                                <button type="button" onClick={searchVinylOnDiscogs} disabled={searchingVinyl}>
+                                    {searchingVinyl ? 'Поиск...' : 'Найти на Discogs'}
+                                </button>
                             </div>
-                        )}
-                    </div>
+                            {vinylSearchResults.length > 0 && (
+                                <div className="vinyl-results">
+                                    {vinylSearchResults.map(vinyl => (
+                                        <div key={vinyl.id} className="vinyl-result-item" onClick={() => selectVinyl(vinyl)}>
+                                            <img src={vinyl.coverImage || 'https://via.placeholder.com/50'} alt={vinyl.title} />
+                                            <div>
+                                                <div className="title">{vinyl.title}</div>
+                                                <div className="artist">{vinyl.artist}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
                 );
-
             case 'RECORD':
                 return (
-                    <div className="form-group">
-                        <label>🎵 Какую пластинку хотите показать?</label>
-                        <div className="vinyl-search">
-                            <input
-                                type="text"
-                                placeholder="Введите название пластинки или исполнителя..."
-                                value={formData.searchVinylQuery}
-                                onChange={(e) => setFormData({...formData, searchVinylQuery: e.target.value})}
-                            />
-                            <button type="button" onClick={searchVinylOnDiscogs} disabled={searchingVinyl}>
-                                {searchingVinyl ? 'Поиск...' : 'Найти на Discogs'}
-                            </button>
-                        </div>
-
-                        {vinylSearchResults.length > 0 && (
-                            <div className="vinyl-results">
-                                {vinylSearchResults.map(vinyl => (
-                                    <div key={vinyl.id} className="vinyl-result-item" onClick={() => selectVinyl(vinyl)}>
-                                        <img src={vinyl.coverImage || 'https://via.placeholder.com/50'} alt={vinyl.title} />
-                                        <div>
-                                            <div className="title">{vinyl.title}</div>
-                                            <div className="artist">{vinyl.artist}</div>
-                                        </div>
-                                    </div>
-                                ))}
+                    <>
+                        <div className="form-group">
+                            <label>🎵 Какую пластинку хотите показать?</label>
+                            <div className="vinyl-search">
+                                <input
+                                    type="text"
+                                    placeholder="Введите название пластинки или исполнителя..."
+                                    value={formData.searchVinylQuery}
+                                    onChange={(e) => setFormData({...formData, searchVinylQuery: e.target.value})}
+                                />
+                                <button type="button" onClick={searchVinylOnDiscogs} disabled={searchingVinyl}>
+                                    {searchingVinyl ? 'Поиск...' : 'Найти на Discogs'}
+                                </button>
                             </div>
-                        )}
-                    </div>
+                            {vinylSearchResults.length > 0 && (
+                                <div className="vinyl-results">
+                                    {vinylSearchResults.map(vinyl => (
+                                        <div key={vinyl.id} className="vinyl-result-item" onClick={() => selectVinyl(vinyl)}>
+                                            <img src={vinyl.coverImage || 'https://via.placeholder.com/50'} alt={vinyl.title} />
+                                            <div>
+                                                <div className="title">{vinyl.title}</div>
+                                                <div className="artist">{vinyl.artist}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
                 );
-
             default:
                 return null;
         }
     };
+
+    const filteredListings = listings.filter(listing => {
+        const matchesSearch = listing.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             listing.username?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType = filterType === 'all' || listing.type === filterType;
+        return matchesSearch && matchesType;
+    });
 
     if (loading) {
         return (
@@ -387,7 +382,6 @@ function Marketplace() {
     return (
         <div className="marketplace-page">
             <div className="marketplace-container">
-                {/* Hero Section */}
                 <div className="marketplace-hero">
                     <div className="marketplace-hero-icon">🛒</div>
                     <h1>Маркетплейс</h1>
@@ -397,11 +391,9 @@ function Marketplace() {
                     </button>
                 </div>
 
-                {/* Форма создания объявления */}
                 {showCreateForm && (
                     <div className="create-listing-form">
                         <h2>Создать объявление</h2>
-
                         <div className="form-group">
                             <label>📋 Тип объявления</label>
                             <div className="type-selector">
@@ -435,10 +427,8 @@ function Marketplace() {
                                 </button>
                             </div>
                         </div>
-
                         <form onSubmit={handleSubmit}>
                             {renderFormFields()}
-
                             <div className="form-group">
                                 <label>📝 Заголовок объявления</label>
                                 <input
@@ -449,7 +439,6 @@ function Marketplace() {
                                     required
                                 />
                             </div>
-
                             <div className="form-group">
                                 <label>📖 Подробное описание</label>
                                 <textarea
@@ -459,7 +448,6 @@ function Marketplace() {
                                     placeholder="Опишите состояние, комплектацию, причину продажи/обмена и т.д."
                                 />
                             </div>
-
                             {formData.selectedVinyl && (
                                 <div className="selected-vinyl-preview">
                                     <h4>Выбранная пластинка:</h4>
@@ -472,7 +460,6 @@ function Marketplace() {
                                     </div>
                                 </div>
                             )}
-
                             <div className="form-actions">
                                 <button type="button" className="cancel-btn" onClick={() => setShowCreateForm(false)}>
                                     Отмена
@@ -485,7 +472,6 @@ function Marketplace() {
                     </div>
                 )}
 
-                {/* Поиск и фильтры */}
                 <div className="marketplace-filters">
                     <div className="search-box">
                         <input
@@ -496,25 +482,14 @@ function Marketplace() {
                         />
                     </div>
                     <div className="filter-buttons">
-                        <button className={filterType === 'all' ? 'active' : ''} onClick={() => setFilterType('all')}>
-                            Все
-                        </button>
-                        <button className={filterType === 'SALE' ? 'active' : ''} onClick={() => setFilterType('SALE')}>
-                            💰 Продажа
-                        </button>
-                        <button className={filterType === 'EXCHANGE' ? 'active' : ''} onClick={() => setFilterType('EXCHANGE')}>
-                            🔄 Обмен
-                        </button>
-                        <button className={filterType === 'SEARCH' ? 'active' : ''} onClick={() => setFilterType('SEARCH')}>
-                            🔍 Поиск
-                        </button>
-                        <button className={filterType === 'RECORD' ? 'active' : ''} onClick={() => setFilterType('RECORD')}>
-                            🎵 На показ
-                        </button>
+                        <button className={filterType === 'all' ? 'active' : ''} onClick={() => setFilterType('all')}>Все</button>
+                        <button className={filterType === 'SALE' ? 'active' : ''} onClick={() => setFilterType('SALE')}>💰 Продажа</button>
+                        <button className={filterType === 'EXCHANGE' ? 'active' : ''} onClick={() => setFilterType('EXCHANGE')}>🔄 Обмен</button>
+                        <button className={filterType === 'SEARCH' ? 'active' : ''} onClick={() => setFilterType('SEARCH')}>🔍 Поиск</button>
+                        <button className={filterType === 'RECORD' ? 'active' : ''} onClick={() => setFilterType('RECORD')}>🎵 На показ</button>
                     </div>
                 </div>
 
-                {/* Список объявлений */}
                 {filteredListings.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-icon">📭</div>
@@ -542,30 +517,36 @@ function Marketplace() {
                                     <div className="listing-details">
                                         <span>🎵 {listing.vinylData?.artist}</span>
                                         <span>📅 {listing.vinylData?.year || '—'}</span>
-                                        {listing.type === 'SALE' && (
-                                            <span className="price">💰 {listing.price} ₽</span>
-                                        )}
+                                        {listing.type === 'SALE' && <span className="price">💰 {listing.price} ₽</span>}
                                         {listing.type === 'EXCHANGE' && listing.desiredRecords && (
                                             <span className="desired">🔄 Хочу: {listing.desiredRecords}</span>
                                         )}
-                                        {listing.type === 'SEARCH' && (
-                                            <span className="search-badge">🔍 Ищу эту пластинку</span>
-                                        )}
-                                        {listing.type === 'RECORD' && (
-                                            <span className="showcase-badge">🎵 Показываю</span>
-                                        )}
+                                        {listing.type === 'SEARCH' && <span className="search-badge">🔍 Ищу эту пластинку</span>}
+                                        {listing.type === 'RECORD' && <span className="showcase-badge">🎵 Показываю</span>}
                                     </div>
                                     <div className="listing-seller">
                                         <div className="seller-info">
                                             <span className="seller-avatar">👤</span>
                                             <span>{listing.username}</span>
                                         </div>
-                                        <button
-                                            className="chat-btn"
-                                            onClick={(e) => startChat(listing, e)}
-                                        >
-                                            💬 Написать
-                                        </button>
+                                        <div className="listing-actions">
+                                            {listing.userId === user?.id && (
+                                                <button
+                                                    className="delete-listing-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        // Без alert — сразу удаляем
+                                                        handleDelete(listing.id, e);
+                                                    }}
+                                                    title="Удалить объявление"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                            <button className="chat-btn" onClick={(e) => startChat(listing, e)}>
+                                                💬 Написать
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

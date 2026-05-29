@@ -55,43 +55,63 @@ export const showNotification = (message, type = 'success') => {
     }, 3000);
 };
 
-// ============ ФУНКЦИИ ДЛЯ ЛОКАЛЬНОЙ КОЛЛЕКЦИИ (для обратной совместимости) ============
-export const getCollection = () => {
-    const saved = localStorage.getItem('vinyl_collection');
-    return saved ? JSON.parse(saved) : [];
-};
+// ============ ФУНКЦИИ ДЛЯ ЛОКАЛЬНОЙ КОЛЛЕКЦИИ (резервное копирование) ============
 
-export const addToCollection = (vinyl) => {
-    const collection = getCollection();
-    if (!collection.some(v => v.id === vinyl.id)) {
-        collection.unshift(vinyl);
-        localStorage.setItem('vinyl_collection', JSON.stringify(collection));
-        return true;
+// Получить локальную коллекцию (из localStorage)
+export const getLocalCollection = () => {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const key = `user_collection_${currentUser.id}`;
+        const collection = localStorage.getItem(key);
+        return collection ? JSON.parse(collection) : [];
+    } catch (error) {
+        console.error('Ошибка загрузки локальной коллекции:', error);
+        return [];
     }
-    return false;
 };
 
-export const removeFromCollection = (id) => {
-    const collection = getCollection();
-    const filtered = collection.filter(v => v.id !== id);
-    localStorage.setItem('vinyl_collection', JSON.stringify(filtered));
+// Сохранить локальную коллекцию (резервная копия)
+export const saveLocalCollection = (collection) => {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser.id) {
+            const key = `user_collection_${currentUser.id}`;
+            localStorage.setItem(key, JSON.stringify(collection));
+        }
+    } catch (error) {
+        console.error('Ошибка сохранения локальной коллекции:', error);
+    }
 };
 
-// ============ ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ ============
-// Получить коллекцию пользователя из БД
-// Получить коллекцию пользователя из БД
+// ============ ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ (ОСНОВНЫЕ) ============
+
+// Получить коллекцию пользователя из БД (с локальным кэшем)
 export const getUserCollection = async (userId) => {
     try {
         const response = await api.get(`/collection/${userId}`);
+
+        // Сохраняем копию в localStorage
+        if (response.data && Array.isArray(response.data)) {
+            saveLocalCollection(response.data);
+        }
+
         return response.data;
     } catch (error) {
-        console.error('Ошибка загрузки коллекции:', error);
+        console.error('Ошибка загрузки коллекции из БД:', error);
+
+        // Если ошибка, возвращаем локальную копию
+        const localCollection = getLocalCollection();
+        if (localCollection.length > 0) {
+            console.log('Загружена локальная копия коллекции');
+            return localCollection;
+        }
+
         return [];
     }
 };
 
 // Добавить пластинку в коллекцию пользователя в БД
-export const addToUserCollection = async (userId, vinylData, userRating, userComment, userPhotos) => {
+export const addToUserCollection = async (userId, vinylData, userRating = 0, userComment = '', userPhotos = []) => {
     try {
         const response = await api.post(`/collection/${userId}/add`, {
             vinylData,
@@ -99,6 +119,13 @@ export const addToUserCollection = async (userId, vinylData, userRating, userCom
             userComment,
             userPhotos
         });
+
+        if (response.data.success) {
+            // Обновляем локальную копию
+            const updatedCollection = await getUserCollection(userId);
+            saveLocalCollection(updatedCollection);
+        }
+
         return response.data;
     } catch (error) {
         console.error('Ошибка добавления в коллекцию:', error);
@@ -110,12 +137,21 @@ export const addToUserCollection = async (userId, vinylData, userRating, userCom
 export const removeFromUserCollection = async (userId, collectionId) => {
     try {
         const response = await api.delete(`/collection/${userId}/${collectionId}`);
+
+        if (response.data.success) {
+            // Обновляем локальную копию
+            const updatedCollection = await getUserCollection(userId);
+            saveLocalCollection(updatedCollection);
+        }
+
         return response.data;
     } catch (error) {
         console.error('Ошибка удаления из коллекции:', error);
         return { success: false, message: 'Ошибка при удалении' };
     }
 };
+
+// Обновить пластинку в коллекции
 export const updateUserCollectionItem = async (userId, collectionId, userRating, userComment, userPhotos) => {
     try {
         const response = await api.put(`/collection/${userId}/${collectionId}`, {
@@ -123,12 +159,80 @@ export const updateUserCollectionItem = async (userId, collectionId, userRating,
             userComment,
             userPhotos
         });
+
+        if (response.data.success) {
+            // Обновляем локальную копию
+            const updatedCollection = await getUserCollection(userId);
+            saveLocalCollection(updatedCollection);
+        }
+
         return response.data;
     } catch (error) {
         console.error('Ошибка обновления коллекции:', error);
         return { success: false, message: 'Ошибка при обновлении' };
     }
 };
+
+// ============ ФУНКЦИИ ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ (для старого кода) ============
+
+// Получить коллекцию (совместимость со старым кодом)
+export const getCollection = () => {
+    return getLocalCollection();
+};
+
+// Сохранить коллекцию (совместимость)
+export const saveCollection = (collection) => {
+    saveLocalCollection(collection);
+};
+
+// Добавить в коллекцию (локально)
+export const addToCollection = (vinyl) => {
+    const collection = getLocalCollection();
+    if (!collection.find(v => v.id === vinyl.id)) {
+        collection.push(vinyl);
+        saveLocalCollection(collection);
+    }
+    return collection;
+};
+
+// Удалить из коллекции (локально)
+export const removeFromCollection = (vinylId) => {
+    let collection = getLocalCollection();
+    collection = collection.filter(v => v.id !== vinylId);
+    saveLocalCollection(collection);
+    return collection;
+};
+
+// Синхронизировать локальную коллекцию с БД
+export const syncCollectionWithServer = async (userId) => {
+    try {
+        // Получаем данные с сервера
+        const serverCollection = await getUserCollection(userId);
+        const localCollection = getLocalCollection();
+
+        // Если на сервере пусто, а локально есть данные - отправляем локальные
+        if (serverCollection.length === 0 && localCollection.length > 0) {
+            for (const vinyl of localCollection) {
+                await addToUserCollection(userId, vinyl.vinylData || vinyl, vinyl.userRating || 0, vinyl.userComment || '');
+            }
+            console.log('Локальные данные синхронизированы с сервером');
+        }
+
+        // Если на сервере есть данные, а локально нет - сохраняем локально
+        if (serverCollection.length > 0 && localCollection.length === 0) {
+            saveLocalCollection(serverCollection);
+            console.log('Данные с сервера сохранены локально');
+        }
+
+        return await getUserCollection(userId);
+    } catch (error) {
+        console.error('Ошибка синхронизации:', error);
+        return getLocalCollection();
+    }
+};
+
+// ============ ФУНКЦИИ ДЛЯ РАБОТЫ С YANDEX MUSIC ============
+
 export const searchYandexMusic = async (query, limit = 10) => {
     try {
         const response = await api.get('/yandex/search', {
@@ -162,6 +266,7 @@ export const playYandexTrack = async (trackId) => {
         return null;
     }
 };
+
 export const searchYandexTrack = async (artist, title) => {
     try {
         const response = await api.get('/yandex/track', {
@@ -173,4 +278,5 @@ export const searchYandexTrack = async (artist, title) => {
         return null;
     }
 };
+
 export default api;

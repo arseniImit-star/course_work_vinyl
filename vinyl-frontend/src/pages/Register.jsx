@@ -71,29 +71,52 @@ function Register({ setIsAuthenticated }) {
 
     const handleAvatarUpload = (e) => {
         const file = e.target.files[0];
-        if (file) {
-            // Проверка типа файла
-            if (!file.type.startsWith('image/')) {
-                setError('Пожалуйста, выберите изображение');
-                return;
-            }
+        if (!file) return;
 
-            // Проверка размера файла (максимум 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                setError('Размер изображения не должен превышать 5MB');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setAvatarPreview(reader.result);
-                setFormData({
-                    ...formData,
-                    avatar: reader.result
-                });
-            };
-            reader.readAsDataURL(file);
+        // Проверка типа
+        if (!file.type.startsWith('image/')) {
+            setError('Пожалуйста, выберите изображение');
+            return;
         }
+
+        // Проверка размера (до 5 MB — можно оставить)
+        if (file.size > 5 * 1024 * 1024) {
+            setError('Размер изображения не должен превышать 5MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Целевой размер аватара (квадрат)
+                const TARGET_SIZE = 150; // 150x150 пикселей
+
+                // Создаём canvas и обрезаем/уменьшаем
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Определяем координаты для центральной обрезки (crop)
+                const size = Math.min(img.width, img.height);
+                const offsetX = (img.width - size) / 2;
+                const offsetY = (img.height - size) / 2;
+
+                // Устанавливаем размеры canvas = TARGET_SIZE x TARGET_SIZE
+                canvas.width = TARGET_SIZE;
+                canvas.height = TARGET_SIZE;
+
+                // Рисуем обрезанное и масштабированное изображение
+                ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, TARGET_SIZE, TARGET_SIZE);
+
+                // Получаем DataURL (можно также blob)
+                const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85); // качество 85%
+
+                setAvatarPreview(resizedDataUrl);
+                setFormData((prev) => ({ ...prev, avatar: resizedDataUrl }));
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     };
 
     const validateForm = () => {
@@ -304,6 +327,7 @@ function Register({ setIsAuthenticated }) {
                             />
                         </div>
 
+                        {/* Поле ввода пароля */}
                         <div className="form-group">
                             <label>🔒 Пароль *</label>
                             <input
@@ -316,17 +340,31 @@ function Register({ setIsAuthenticated }) {
                             />
                             {errors.password && <span className="field-error">{errors.password}</span>}
 
+                            {/* Отображаем требования к паролю */}
                             {formData.password && (
-                                <div className="password-strength">
+                                <div className="password-requirements">
+                                    <p>Пароль должен содержать:</p>
+                                    <ul>
+                                        <li className={passwordStrength.checks.length ? 'met' : 'unmet'}>
+                                            {passwordStrength.checks.length ? '✅' : '❌'} минимум 8 символов
+                                        </li>
+                                        <li className={passwordStrength.checks.uppercase ? 'met' : 'unmet'}>
+                                            {passwordStrength.checks.uppercase ? '✅' : '❌'} хотя бы одну заглавную букву (A–Z)
+                                        </li>
+                                        <li className={passwordStrength.checks.lowercase ? 'met' : 'unmet'}>
+                                            {passwordStrength.checks.lowercase ? '✅' : '❌'} хотя бы одну строчную букву (a–z)
+                                        </li>
+                                        <li className={passwordStrength.checks.number ? 'met' : 'unmet'}>
+                                            {passwordStrength.checks.number ? '✅' : '❌'} хотя бы одну цифру (0–9)
+                                        </li>
+                                        <li className={passwordStrength.checks.special ? 'met' : 'unmet'}>
+                                            {passwordStrength.checks.special ? '✅' : '❌'} хотя бы один спецсимвол (!@#$%^&*...)
+                                        </li>
+                                    </ul>
                                     <div className="strength-bar">
-                                        <div
-                                            className={`strength-fill strength-${passwordStrength.score}`}
-                                            style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
-                                        ></div>
+                                        <div className={`strength-fill strength-${passwordStrength.score}`} style={{ width: `${(passwordStrength.score / 5) * 100}%` }}></div>
                                     </div>
-                                    <span className={`strength-text strength-${passwordStrength.score}`}>
-                                        {passwordStrength.message}
-                                    </span>
+                                    <span className={`strength-text strength-${passwordStrength.score}`}>{passwordStrength.message}</span>
                                 </div>
                             )}
                         </div>

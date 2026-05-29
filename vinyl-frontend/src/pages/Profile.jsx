@@ -1,40 +1,45 @@
 // Profile.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api, { getCollection, removeFromCollection } from '../api/api';
+import { useNavigate, Link } from 'react-router-dom';
+import api, {
+    getUserCollection,
+    removeFromUserCollection,
+    showNotification
+} from '../api/api';
 import './Profile.css';
 
 function Profile() {
     const navigate = useNavigate();
 
-    // Все хуки должны быть на верхнем уровне - ДО любых условий и return
     const [user, setUser] = useState({
+        id: null,
         username: '',
         email: '',
-        collectingSince: 2020,
-        favoriteGenres: [],
+        firstName: '',
+        lastName: '',
+        city: '',
         bio: '',
-        avatar: 'https://i.pravatar.cc/150?img=7'
+        avatar: null,
+        collectingSince: new Date().getFullYear(),
+        favoriteGenres: []
     });
+
     const [editing, setEditing] = useState(false);
     const [formData, setFormData] = useState({ ...user });
-    const [favoriteVinyls, setFavoriteVinyls] = useState([]);
     const [myCollection, setMyCollection] = useState([]);
-    const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(true);
     const [tracklists, setTracklists] = useState({});
     const [expandedVinyl, setExpandedVinyl] = useState(null);
     const [totalRating, setTotalRating] = useState(0);
     const [avgRating, setAvgRating] = useState(0);
+    const [activeTab, setActiveTab] = useState('profile');
 
     const genreOptions = ['Рок', 'Поп', 'Джаз', 'Классика', 'Электроника', 'Хип-хоп', 'Металл', 'Блюз', 'Фанк', 'Соул'];
 
-    // useEffect на верхнем уровне
     useEffect(() => {
         loadAllData();
     }, []);
 
-    // useEffect для обновления статистики при изменении коллекции
     useEffect(() => {
         const total = myCollection.reduce((sum, v) => sum + (v.userRating || 0), 0);
         setTotalRating(total);
@@ -42,43 +47,89 @@ function Profile() {
         setAvgRating(avg);
     }, [myCollection]);
 
-    // Функции загрузки данных
     const loadAllData = async () => {
         setLoading(true);
 
-        // Загружаем данные пользователя из localStorage
         const userData = localStorage.getItem('user');
-        if (userData) {
-            const parsedUser = JSON.parse(userData);
-            setUser(prev => ({
-                ...prev,
-                username: parsedUser.username,
-                id: parsedUser.id
-            }));
-            setFormData(prev => ({
-                ...prev,
-                username: parsedUser.username,
-                id: parsedUser.id
-            }));
-        } else {
+        const token = localStorage.getItem('token');
+
+        if (!userData || !token) {
             navigate('/login');
             return;
         }
 
+        const parsedUser = JSON.parse(userData);
+
+        try {
+            // Пытаемся получить данные с бэкенда
+            const response = await api.get(`/users/${parsedUser.id}`);
+            setUser({
+                id: response.data.id,
+                username: response.data.username,
+                email: response.data.email,
+                firstName: response.data.firstName || '',
+                lastName: response.data.lastName || '',
+                city: response.data.city || '',
+                bio: response.data.bio || '',
+                avatar: response.data.avatar || parsedUser.avatar || null,
+                collectingSince: response.data.collectingSince || new Date().getFullYear(),
+                favoriteGenres: response.data.favoriteGenres || []
+            });
+            setFormData({
+                id: response.data.id,
+                username: response.data.username,
+                email: response.data.email,
+                firstName: response.data.firstName || '',
+                lastName: response.data.lastName || '',
+                city: response.data.city || '',
+                bio: response.data.bio || '',
+                avatar: response.data.avatar || parsedUser.avatar || null,
+                collectingSince: response.data.collectingSince || new Date().getFullYear(),
+                favoriteGenres: response.data.favoriteGenres || []
+            });
+        } catch (error) {
+            // Если бэкенд недоступен, используем данные из localStorage
+            console.log('Используем локальные данные пользователя');
+            setUser(prev => ({
+                ...prev,
+                id: parsedUser.id,
+                username: parsedUser.username,
+                email: parsedUser.email || '',
+                avatar: parsedUser.avatar || null
+            }));
+            setFormData(prev => ({
+                ...prev,
+                id: parsedUser.id,
+                username: parsedUser.username,
+                email: parsedUser.email || '',
+                avatar: parsedUser.avatar || null
+            }));
+        }
+
+        // Загружаем коллекцию
         await loadMyCollection();
-        await loadFavoriteVinyls();
 
         setLoading(false);
     };
 
+    // Загрузка коллекции из БД
     const loadMyCollection = async () => {
-        const savedCollection = getCollection();
-        setMyCollection(savedCollection);
+        if (user.id) {
+            try {
+                const collection = await getUserCollection(user.id);
+                console.log('Загружена коллекция из БД:', collection);
+                setMyCollection(collection);
 
-        // Загружаем треклисты для пластинок в коллекции
-        for (const vinyl of savedCollection) {
-            if (vinyl.id && !tracklists[vinyl.id]) {
-                await loadTracklist(vinyl.id);
+                // Загружаем треклисты для пластинок
+                for (const item of collection) {
+                    const vinylId = item.vinylData?.id;
+                    if (vinylId && !tracklists[vinylId]) {
+                        await loadTracklist(vinylId);
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки коллекции:', error);
+                setMyCollection([]);
             }
         }
     };
@@ -91,6 +142,7 @@ function Profile() {
                 [vinylId]: response.data
             }));
         } catch (error) {
+            console.error('Ошибка загрузки треклиста:', error);
             setTracklists(prev => ({
                 ...prev,
                 [vinylId]: []
@@ -98,51 +150,39 @@ function Profile() {
         }
     };
 
-    const loadFavoriteVinyls = async () => {
-        try {
-            const response = await api.get('/users/favorites');
-            setFavoriteVinyls(response.data || []);
-        } catch (error) {
-            // Демо-данные
-            const demoFavorites = [
-                { id: 1, title: 'Abbey Road', artist: 'The Beatles', year: 1969, price: 3500, coverImage: 'https://images.unsplash.com/photo-1603048588669-1b6e9b9c8f8f?w=200' },
-                { id: 2, title: 'Kind of Blue', artist: 'Miles Davis', year: 1959, price: 4200, coverImage: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=200' }
-            ];
-            setFavoriteVinyls(demoFavorites);
-        }
-    };
-
     const handleUpdate = async (e) => {
         e.preventDefault();
-        setUser({ ...formData });
-        setEditing(false);
 
         try {
+            if (api && user.id) {
+                await api.put(`/users/${user.id}`, formData);
+            }
+
             const userData = JSON.parse(localStorage.getItem('user') || '{}');
             const updatedUser = { ...userData, ...formData };
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
-            if (api && formData.id) {
-                await api.put(`/users/${formData.id}`, formData);
-            }
-            alert('✅ Профиль обновлен!');
+            setUser({ ...formData });
+            setEditing(false);
+
+            showNotification('✅ Профиль успешно обновлен!', 'success');
         } catch (error) {
-            alert('✅ Данные сохранены локально!');
+            console.error('Ошибка обновления:', error);
+            showNotification('⚠️ Данные сохранены локально', 'info');
+            setUser({ ...formData });
+            setEditing(false);
         }
     };
 
-    const handleRemoveFromCollection = (vinyl) => {
-        if (window.confirm(`Удалить "${vinyl.title}" из коллекции?`)) {
-            removeFromCollection(vinyl.id);
-            loadMyCollection();
-            alert('❌ Пластинка удалена из коллекции');
-        }
-    };
-
-    const handleRemoveFromFavorites = async (vinylId) => {
-        if (window.confirm('Удалить пластинку из избранного?')) {
-            setFavoriteVinyls(favoriteVinyls.filter(v => v.id !== vinylId));
-            alert('❌ Пластинка удалена из избранного');
+    const handleRemoveFromCollection = async (collectionItem) => {
+        if (window.confirm(`Удалить "${collectionItem.vinylData?.title}" из коллекции?`)) {
+            const result = await removeFromUserCollection(user.id, collectionItem.id);
+            if (result.success) {
+                showNotification('✅ Пластинка удалена из коллекции', 'success');
+                await loadMyCollection(); // Перезагружаем коллекцию
+            } else {
+                showNotification('❌ Ошибка при удалении', 'error');
+            }
         }
     };
 
@@ -159,10 +199,9 @@ function Profile() {
 
     const getYearsSince = () => {
         const currentYear = new Date().getFullYear();
-        return currentYear - (user.collectingSince || 2020);
+        return currentYear - (user.collectingSince || new Date().getFullYear());
     };
 
-    // Проверка на загрузку после всех хуков
     if (loading) {
         return (
             <div className="loading-container">
@@ -172,7 +211,6 @@ function Profile() {
         );
     }
 
-    // Рендер компонента
     return (
         <div className="profile-page">
             <div className="profile-container">
@@ -180,24 +218,33 @@ function Profile() {
                 <div className="profile-hero">
                     <div className="profile-hero-content">
                         <div className="profile-avatar">
-                            <img src={user.avatar} alt={user.username} />
+                            {user.avatar ? (
+                                <img src={user.avatar} alt={user.username} />
+                            ) : (
+                                <div className="avatar-placeholder">
+                                    <span>🎵</span>
+                                </div>
+                            )}
                             <div className="avatar-badge">🎵</div>
                         </div>
                         <div className="profile-hero-info">
                             <h1>{user.username || 'Коллекционер'}</h1>
-                            <p className="profile-badge">🎵 Коллекционер винила</p>
+                            <p className="profile-badge">
+                                🎵 Коллекционер винила
+                                {user.city && ` • ${user.city}`}
+                            </p>
                             <div className="profile-stats">
                                 <div className="stat">
                                     <span className="stat-value">{myCollection.length}</span>
                                     <span className="stat-label">пластинок</span>
                                 </div>
                                 <div className="stat">
-                                    <span className="stat-value">{favoriteVinyls.length}</span>
-                                    <span className="stat-label">в избранном</span>
-                                </div>
-                                <div className="stat">
                                     <span className="stat-value">{avgRating}</span>
                                     <span className="stat-label">средний рейтинг</span>
+                                </div>
+                                <div className="stat">
+                                    <span className="stat-value">{getYearsSince()}</span>
+                                    <span className="stat-label">лет в коллекционировании</span>
                                 </div>
                             </div>
                         </div>
@@ -215,9 +262,6 @@ function Profile() {
                     <button className={activeTab === 'collection' ? 'active' : ''} onClick={() => setActiveTab('collection')}>
                         <span>🎵</span> Моя коллекция ({myCollection.length})
                     </button>
-                    <button className={activeTab === 'favorites' ? 'active' : ''} onClick={() => setActiveTab('favorites')}>
-                        <span>❤️</span> Избранное ({favoriteVinyls.length})
-                    </button>
                 </div>
 
                 {/* Profile Tab */}
@@ -226,7 +270,7 @@ function Profile() {
                         {editing ? (
                             <form onSubmit={handleUpdate} className="profile-form">
                                 <div className="form-group">
-                                    <label>👤 Имя пользователя</label>
+                                    <label>👤 Имя пользователя *</label>
                                     <input
                                         type="text"
                                         value={formData.username || ''}
@@ -234,6 +278,28 @@ function Profile() {
                                         required
                                     />
                                 </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>📝 Имя</label>
+                                        <input
+                                            type="text"
+                                            value={formData.firstName || ''}
+                                            onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                                            placeholder="Ваше имя"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>📝 Фамилия</label>
+                                        <input
+                                            type="text"
+                                            value={formData.lastName || ''}
+                                            onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                                            placeholder="Ваша фамилия"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="form-group">
                                     <label>📧 Email</label>
                                     <input
@@ -243,6 +309,17 @@ function Profile() {
                                         placeholder="your@email.com"
                                     />
                                 </div>
+
+                                <div className="form-group">
+                                    <label>🏙️ Город</label>
+                                    <input
+                                        type="text"
+                                        value={formData.city || ''}
+                                        onChange={(e) => setFormData({...formData, city: e.target.value})}
+                                        placeholder="Ваш город"
+                                    />
+                                </div>
+
                                 <div className="form-group">
                                     <label>📅 Год начала коллекционирования</label>
                                     <input
@@ -250,9 +327,10 @@ function Profile() {
                                         value={formData.collectingSince}
                                         onChange={(e) => setFormData({...formData, collectingSince: parseInt(e.target.value)})}
                                         min="1950"
-                                        max="2026"
+                                        max={new Date().getFullYear()}
                                     />
                                 </div>
+
                                 <div className="form-group">
                                     <label>🎸 Любимые жанры</label>
                                     <div className="genres-checkbox">
@@ -273,6 +351,7 @@ function Profile() {
                                         ))}
                                     </div>
                                 </div>
+
                                 <div className="form-group">
                                     <label>📝 О себе</label>
                                     <textarea
@@ -282,6 +361,7 @@ function Profile() {
                                         placeholder="Расскажите о своей коллекции, любимых пластинках..."
                                     />
                                 </div>
+
                                 <div className="form-group">
                                     <label>🖼️ URL аватара</label>
                                     <input
@@ -291,6 +371,7 @@ function Profile() {
                                         placeholder="https://..."
                                     />
                                 </div>
+
                                 <div className="form-actions">
                                     <button type="submit" className="save-btn">💾 Сохранить изменения</button>
                                     <button type="button" className="cancel-btn" onClick={() => {
@@ -308,10 +389,22 @@ function Profile() {
                                             <span className="info-label">👤 Имя пользователя</span>
                                             <span className="info-value">{user.username || '—'}</span>
                                         </div>
+                                        {user.firstName && (
+                                            <div className="info-item">
+                                                <span className="info-label">📝 Имя</span>
+                                                <span className="info-value">{user.firstName} {user.lastName}</span>
+                                            </div>
+                                        )}
                                         <div className="info-item">
                                             <span className="info-label">📧 Email</span>
                                             <span className="info-value">{user.email || 'не указан'}</span>
                                         </div>
+                                        {user.city && (
+                                            <div className="info-item">
+                                                <span className="info-label">🏙️ Город</span>
+                                                <span className="info-value">{user.city}</span>
+                                            </div>
+                                        )}
                                         <div className="info-item">
                                             <span className="info-label">📅 Коллекционирую с</span>
                                             <span className="info-value">{user.collectingSince} год ({getYearsSince()} лет)</span>
@@ -319,22 +412,23 @@ function Profile() {
                                     </div>
                                 </div>
 
-                                <div className="info-section">
-                                    <h3>🎸 Любимые жанры</h3>
-                                    <div className="genres-tags">
-                                        {user.favoriteGenres?.map(g => (
-                                            <span key={g} className="genre-tag">{g}</span>
-                                        ))}
-                                        {(!user.favoriteGenres || user.favoriteGenres.length === 0) && (
-                                            <span className="no-data">Не указаны</span>
-                                        )}
+                                {user.favoriteGenres && user.favoriteGenres.length > 0 && (
+                                    <div className="info-section">
+                                        <h3>🎸 Любимые жанры</h3>
+                                        <div className="genres-tags">
+                                            {user.favoriteGenres.map(g => (
+                                                <span key={g} className="genre-tag">{g}</span>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
-                                <div className="info-section">
-                                    <h3>📝 О себе</h3>
-                                    <p className="bio-text">{user.bio || 'Расскажите о себе и своей коллекции'}</p>
-                                </div>
+                                {user.bio && (
+                                    <div className="info-section">
+                                        <h3>📝 О себе</h3>
+                                        <p className="bio-text">{user.bio}</p>
+                                    </div>
+                                )}
 
                                 <div className="info-section">
                                     <h3>📊 Статистика коллекции</h3>
@@ -371,103 +465,66 @@ function Profile() {
                                 </button>
                             </div>
                         ) : (
-                            myCollection.map((vinyl) => (
-                                <div key={vinyl.id} className="vinyl-card">
+                            myCollection.map((item) => (
+                                <div key={item.id} className="vinyl-card">
                                     <div className="vinyl-image">
-                                        {vinyl.coverImage ? (
-                                            <img src={vinyl.coverImage} alt={vinyl.title} />
+                                        {item.vinylData?.coverImage ? (
+                                            <img src={item.vinylData.coverImage} alt={item.vinylData.title} />
                                         ) : (
                                             <div className="no-image">🎵</div>
                                         )}
                                     </div>
                                     <div className="vinyl-info">
-                                        <div className="vinyl-title">{vinyl.title}</div>
-                                        <div className="vinyl-artist">{vinyl.artist}</div>
-                                        <div className="vinyl-year">📅 {vinyl.year || '—'}</div>
-                                        {vinyl.userRating > 0 && (
+                                        <div className="vinyl-title">{item.vinylData?.title}</div>
+                                        <div className="vinyl-artist">{item.vinylData?.artist}</div>
+                                        <div className="vinyl-year">📅 {item.vinylData?.year || '—'}</div>
+                                        {item.vinylData?.genre && (
+                                            <div className="vinyl-genre">🎸 {item.vinylData.genre}</div>
+                                        )}
+                                        {item.userRating > 0 && (
                                             <div className="vinyl-rating">
-                                                {'★'.repeat(vinyl.userRating)}{'☆'.repeat(5 - vinyl.userRating)}
+                                                {'★'.repeat(item.userRating)}{'☆'.repeat(5 - item.userRating)}
                                             </div>
                                         )}
 
-                                        {/* Треклист */}
-                                        {expandedVinyl === vinyl.id && tracklists[vinyl.id] && tracklists[vinyl.id].length > 0 && (
+                                        {expandedVinyl === item.vinylData?.id && tracklists[item.vinylData?.id] && tracklists[item.vinylData?.id].length > 0 && (
                                             <div className="vinyl-tracklist">
                                                 <div className="tracklist-title">🎵 Треклист:</div>
                                                 <div className="tracklist-items">
-                                                    {tracklists[vinyl.id].slice(0, 5).map((track, idx) => (
+                                                    {tracklists[item.vinylData.id].slice(0, 5).map((track, idx) => (
                                                         <div key={idx} className="tracklist-item">
                                                             <span className="track-num">{track.position || idx + 1}</span>
                                                             <span className="track-name">{track.title}</span>
                                                             <span className="track-time">{track.duration}</span>
                                                         </div>
                                                     ))}
-                                                    {tracklists[vinyl.id].length > 5 && (
-                                                        <div className="tracklist-more">+ ещё {tracklists[vinyl.id].length - 5} треков</div>
+                                                    {tracklists[item.vinylData.id].length > 5 && (
+                                                        <div className="tracklist-more">+ ещё {tracklists[item.vinylData.id].length - 5} треков</div>
                                                     )}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {vinyl.userComment && (
+                                        {item.userComment && (
                                             <div className="vinyl-comment">
-                                                💬 {vinyl.userComment.length > 50 ? vinyl.userComment.substring(0, 50) + '...' : vinyl.userComment}
+                                                💬 {item.userComment.length > 60 ? item.userComment.substring(0, 60) + '...' : item.userComment}
                                             </div>
                                         )}
 
-                                        <button
-                                            className="expand-tracklist-btn"
-                                            onClick={() => handleExpandTracklist(vinyl.id)}
-                                        >
-                                            {expandedVinyl === vinyl.id ? '▲ Скрыть треки' : '▼ Показать треки'}
-                                        </button>
-
-                                        <button
-                                            className="remove-btn"
-                                            onClick={() => handleRemoveFromCollection(vinyl)}
-                                        >
-                                            ❌ Удалить
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
-
-                {/* Favorites Tab */}
-                {activeTab === 'favorites' && (
-                    <div className="vinyls-grid">
-                        {favoriteVinyls.length === 0 ? (
-                            <div className="empty-state">
-                                <div className="empty-icon">❤️</div>
-                                <h3>Избранное пусто</h3>
-                                <p>Добавьте пластинки в избранное из каталога</p>
-                                <button onClick={() => navigate('/')} className="shop-btn">
-                                    🎵 Перейти в каталог
-                                </button>
-                            </div>
-                        ) : (
-                            favoriteVinyls.map(vinyl => (
-                                <div key={vinyl.id} className="vinyl-card">
-                                    <div className="vinyl-image">
-                                        {vinyl.coverImage ? (
-                                            <img src={vinyl.coverImage} alt={vinyl.title} />
-                                        ) : (
-                                            <div className="no-image">🎵</div>
-                                        )}
-                                    </div>
-                                    <div className="vinyl-info">
-                                        <div className="vinyl-title">{vinyl.title}</div>
-                                        <div className="vinyl-artist">{vinyl.artist}</div>
-                                        <div className="vinyl-year">📅 {vinyl.year || '—'}</div>
-                                        {vinyl.price && <div className="vinyl-price">💰 {vinyl.price} ₽</div>}
-                                        <button
-                                            className="remove-fav-btn"
-                                            onClick={() => handleRemoveFromFavorites(vinyl.id)}
-                                        >
-                                            ❤️ Удалить из избранного
-                                        </button>
+                                        <div className="vinyl-buttons">
+                                            <button
+                                                className="tracklist-btn"
+                                                onClick={() => handleExpandTracklist(item.vinylData?.id)}
+                                            >
+                                                {expandedVinyl === item.vinylData?.id ? '▲ Скрыть треки' : '▼ Показать треки'}
+                                            </button>
+                                            <button
+                                                className="remove-btn"
+                                                onClick={() => handleRemoveFromCollection(item)}
+                                            >
+                                                ❌ Удалить
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))

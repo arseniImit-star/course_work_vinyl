@@ -48,6 +48,24 @@ function ListingDetail() {
         }
     };
 
+    // 🔥 Функция удаления объявления (добавлена)
+    const handleDelete = async () => {
+        if (!window.confirm('Вы уверены, что хотите удалить это объявление?')) return;
+
+        try {
+            const response = await api.delete(`/marketplace/listings/${id}`);
+            if (response.data.success) {
+                showNotification('✅ Объявление удалено', 'success');
+                navigate('/marketplace'); // Перенаправляем на список объявлений
+            } else {
+                showNotification('❌ Не удалось удалить объявление', 'error');
+            }
+        } catch (error) {
+            console.error('Ошибка удаления:', error);
+            showNotification('❌ Ошибка при удалении объявления', 'error');
+        }
+    };
+
     const handleAddComment = async (e) => {
         e.preventDefault();
         if (!newComment.trim()) return;
@@ -62,13 +80,13 @@ function ListingDetail() {
         try {
             const response = await api.post(`/marketplace/listings/${id}/comments`, {
                 content: newComment,
-                userId: user.id  // ← ПЕРЕДАЕМ ID ТЕКУЩЕГО ПОЛЬЗОВАТЕЛЯ
+                userId: user.id
             });
 
             if (response.data.success) {
                 showNotification('✅ Комментарий добавлен', 'success');
                 setNewComment('');
-                loadComments();  // Перезагружаем комментарии
+                loadComments();
             } else {
                 showNotification(response.data.error || '❌ Ошибка при добавлении', 'error');
             }
@@ -91,7 +109,6 @@ function ListingDetail() {
             return;
         }
 
-        // Не даем написать сообщение себе (если это своё объявление)
         if (user.id === listing.userId) {
             showNotification('❌ Это ваше объявление, вы не можете написать себе', 'error');
             return;
@@ -163,6 +180,12 @@ function ListingDetail() {
                         <div className="listing-type-badge" style={{ background: getTypeColor(listing.type) }}>
                             {getTypeIcon(listing.type)} {getTypeLabel(listing.type)}
                         </div>
+                        {/* 🔥 Кнопка удаления для владельца (добавлена в шапку) */}
+                        {listing.userId === user?.id && (
+                            <button className="delete-listing-btn-header" onClick={handleDelete}>
+                                🗑️ Удалить объявление
+                            </button>
+                        )}
                     </div>
 
                     <div className="detail-content">
@@ -204,16 +227,23 @@ function ListingDetail() {
                                             📋 Просмотреть профиль
                                         </Link>
                                     </div>
-                                    <button className="message-seller-btn" onClick={startChat}>
-                                        💬 Написать продавцу
-                                    </button>
+                                    {listing.userId !== user?.id && (
+                                        <button className="message-seller-btn" onClick={startChat}>
+                                            💬 Написать продавцу
+                                        </button>
+                                    )}
+                                    {/* 🔥 Альтернативный вариант: кнопка удаления также может быть здесь */}
+                                    {/* {listing.userId === user?.id && (
+                                        <button className="delete-listing-btn" onClick={handleDelete}>
+                                            🗑️ Удалить объявление
+                                        </button>
+                                    )} */}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Секция комментариев */}
                 <div className="comments-section">
                     <h3>💬 Комментарии ({comments.length})</h3>
 

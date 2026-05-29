@@ -18,6 +18,24 @@ function Home() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
 
+    // RuTube states - ТОЛЬКО ОДИН РАЗ
+    const [rutubeResults, setRuTubeResults] = useState({});
+    const [searchingRuTube, setSearchingRuTube] = useState({});
+    const [expandedVideo, setExpandedVideo] = useState({});
+    const [selectedVideo, setSelectedVideo] = useState(null);
+    const [showVideoModal, setShowVideoModal] = useState(false);
+
+    // Функция открытия видео в отдельном окне
+    const openVideoModal = (video) => {
+        setSelectedVideo(video);
+        setShowVideoModal(true);
+    };
+
+    // Функция закрытия видео
+    const closeVideoModal = () => {
+        setSelectedVideo(null);
+        setShowVideoModal(false);
+    };
     const genres = [
         { id: 'all', name: 'Все', emoji: '🎵' },
         { id: 'Rock', name: 'Рок', emoji: '🎸' },
@@ -118,8 +136,35 @@ function Home() {
         return [];
     };
 
+    // Функция поиска на RuTube
+    const searchRuTube = async (artist, title, trackIndex) => {
+        setSearchingRuTube(prev => ({ ...prev, [trackIndex]: true }));
+
+        try {
+            const response = await api.get('/rutube/track', {
+                params: { artist, track: title }
+            });
+
+            setRuTubeResults(prev => ({
+                ...prev,
+                [trackIndex]: response.data.videos || []
+            }));
+        } catch (error) {
+            console.error('Ошибка поиска на RuTube:', error);
+        } finally {
+            setSearchingRuTube(prev => ({ ...prev, [trackIndex]: false }));
+        }
+    };
+
+    // Функция открытия/закрытия видео
+    const toggleVideo = (trackIndex) => {
+        setExpandedVideo(prev => ({
+            ...prev,
+            [trackIndex]: !prev[trackIndex]
+        }));
+    };
+
     useEffect(() => {
-        // Проверяем авторизацию
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
 
@@ -136,7 +181,6 @@ function Home() {
         loadRandomVinyls();
     }, []);
 
-    // Загрузка коллекции пользователя из БД
     const loadUserCollection = async (userId) => {
         const userCollection = await getUserCollection(userId);
         setCollection(userCollection);
@@ -232,14 +276,12 @@ function Home() {
     const handleAddToCollection = async (vinyl, e) => {
         e.stopPropagation();
 
-        // Проверяем авторизацию
         if (!isAuthenticated || !currentUser) {
             showNotification('🔒 Войдите в аккаунт, чтобы добавить пластинку в коллекцию', 'error');
             setTimeout(() => navigate('/login'), 1500);
             return;
         }
 
-        // Подготавливаем данные пластинки
         const vinylData = {
             id: vinyl.id,
             title: vinyl.title,
@@ -253,13 +295,12 @@ function Home() {
             tracklist: tracklists[vinyl.id] || []
         };
 
-        // Добавляем в БД
         const result = await addToUserCollection(
             currentUser.id,
             vinylData,
-            0, // userRating
-            null, // userComment
-            null // userPhotos
+            0,
+            null,
+            null
         );
 
         if (result.success) {
@@ -410,12 +451,35 @@ function Home() {
                                             <div>#</div>
                                             <div>Название трека</div>
                                             <div>Длительность</div>
+                                            <div></div>
                                         </div>
                                         {tracklists[selectedVinyl.id].map((track, idx) => (
-                                            <div key={idx} className="detail-track-item">
-                                                <div className="detail-track-position">{track.position || idx + 1}</div>
+                                            <div key={idx} className="detail-track-item-with-rutube">
+                                                <div className="detail-track-position">{idx + 1}</div>
                                                 <div className="detail-track-title">{track.title}</div>
                                                 <div className="detail-track-duration">{track.duration || '—'}</div>
+                                                <div className="detail-track-actions">
+                                                    {/* Кнопка поиска на RuTube */}
+                                                    <button
+                                                        className="rutube-search-btn"
+                                                        onClick={() => searchRuTube(selectedVinyl.artist, track.title, idx)}
+                                                        disabled={searchingRuTube[idx]}
+                                                        title="Найти на RuTube"
+                                                    >
+                                                        {searchingRuTube[idx] ? '⏳' : '📺'}
+                                                    </button>
+
+                                                    {/* Кнопка открытия видео в отдельном окне (есть результаты) */}
+                                                    {rutubeResults[idx] && rutubeResults[idx].length > 0 && (
+                                                        <button
+                                                            className="rutube-watch-btn"
+                                                            onClick={() => openVideoModal(rutubeResults[idx][0])}
+                                                            title="Смотреть видео"
+                                                        >
+                                                            ▶️
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -423,6 +487,30 @@ function Home() {
                             ) : (
                                 <div className="tracklist-empty-modal">
                                     <p>📝 Треклист не найден для этой пластинки</p>
+                                </div>
+                            )}
+
+                            {/* Модальное окно для видео */}
+                            {showVideoModal && selectedVideo && (
+                                <div className="video-modal-overlay" onClick={closeVideoModal}>
+                                    <div className="video-modal-content" onClick={(e) => e.stopPropagation()}>
+                                        <button className="video-modal-close" onClick={closeVideoModal}>×</button>
+                                        <h3>{selectedVideo.title}</h3>
+                                        <div className="video-container">
+                                            <iframe
+                                                src={`https://rutube.ru/play/embed/${selectedVideo.id}`}
+                                                title={selectedVideo.title}
+                                                frameBorder="0"
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                allowFullScreen
+                                                className="video-iframe"
+                                            ></iframe>
+                                        </div>
+                                        <div className="video-details">
+                                            <p>📺 Канал: {selectedVideo.author}</p>
+                                            <p>👁️ Просмотров: {selectedVideo.views?.toLocaleString() || '—'}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

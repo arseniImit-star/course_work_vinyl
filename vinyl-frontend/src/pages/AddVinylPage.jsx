@@ -32,6 +32,18 @@ function AddVinylPage() {
     // Добавьте новые состояния в секцию с useState
     const [selectedVideo, setSelectedVideo] = useState(null);
     const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+    const [expandedVideo, setExpandedVideo] = useState({}); // { trackIndex: true/false }
+    const toggleVideo = (trackIndex, video) => {
+        setExpandedVideo(prev => ({
+            ...prev,
+            [trackIndex]: !prev[trackIndex]
+        }));
+        if (!expandedVideo[trackIndex]) {
+            setSelectedVideo(video);
+        } else {
+            setSelectedVideo(null);
+        }
+    };
     // Демо-треклисты для известных пластинок (fallback)
     const getDemoTracklist = (vinylId, title, artist) => {
         const demoTracklists = {
@@ -182,6 +194,9 @@ function AddVinylPage() {
 
     // Функция поиска на RuTube
     const searchRuTube = async (artist, title, trackIndex) => {
+        // Проверяем, что это всё ещё текущая пластинка
+        if (!selectedVinyl) return;
+
         setSearchingRuTube(prev => ({ ...prev, [trackIndex]: true }));
 
         try {
@@ -189,10 +204,13 @@ function AddVinylPage() {
                 params: { artist, track: title }
             });
 
-            setRuTubeResults(prev => ({
-                ...prev,
-                [trackIndex]: response.data.videos || []
-            }));
+            // Проверяем, что пластинка не изменилась за время запроса
+            if (selectedVinyl) {
+                setRuTubeResults(prev => ({
+                    ...prev,
+                    [trackIndex]: response.data.videos || []
+                }));
+            }
         } catch (error) {
             console.error('Ошибка поиска на RuTube:', error);
         } finally {
@@ -250,22 +268,17 @@ function AddVinylPage() {
         }
     };
 
-    const handleVinylClick = async (vinyl) => {
-        setSelectedVinyl(vinyl);
-        setShowDetails(true);
-        await loadTracklist(vinyl.id, vinyl.title, vinyl.artist);
-    };
 
     // После загрузки треклиста ищем треки на Яндекс.Музыке
+    // Очистка при размонтировании компонента
     useEffect(() => {
-        if (tracklist.length > 0 && selectedVinyl?.artist) {
-            tracklist.forEach((track, idx) => {
-                if (track.title && !yandexTracks[idx] && !searchingYandex[idx]) {
-                    searchYandexTrack(selectedVinyl.artist, track.title, idx);
-                }
-            });
-        }
-    }, [tracklist, selectedVinyl]);
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+        };
+    }, []);
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
@@ -273,6 +286,36 @@ function AddVinylPage() {
         setPhotos([...photos, ...files]);
         setPhotoPreviews([...photoPreviews, ...newPreviews]);
     };
+    const handleVinylClick = async (vinyl) => {
+        // Очищаем предыдущие результаты перед загрузкой новой пластинки
+        setYandexTracks({});
+        setSearchingYandex({});
+        setRuTubeResults({});
+        setSearchingRuTube({});
+        setPlayingTrack(null);
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+
+        setSelectedVinyl(vinyl);
+        setShowDetails(true);
+        await loadTracklist(vinyl.id, vinyl.title, vinyl.artist);
+    };
+const handleCloseModal = () => {
+    setShowDetails(false);
+    setSelectedVinyl(null);
+    setTracklist([]);
+    setYandexTracks({});
+    setSearchingYandex({});
+    setRuTubeResults({});
+    setSearchingRuTube({});
+    setPlayingTrack(null);
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+    }
+};
 
     const handleAddToCollection = async () => {
         if (!selectedVinyl) return;
@@ -399,9 +442,9 @@ function AddVinylPage() {
 
                 {/* Modal for Vinyl Details */}
                 {showDetails && selectedVinyl && (
-                    <div className="detail-modal-overlay" onClick={() => setShowDetails(false)}>
+                    <div className="detail-modal-overlay" onClick={handleCloseModal}>
                         <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
-                            <button className="detail-modal-close" onClick={() => setShowDetails(false)}>×</button>
+                            <button className="detail-modal-close" onClick={handleCloseModal}>×</button>
 
                             <div className="detail-modal-body">
                                 <div className="detail-vinyl-preview">
@@ -437,7 +480,7 @@ function AddVinylPage() {
                                         <h4>🎵 Треклист</h4>
                                         <div className="tracklist-items">
                                             {tracklist.map((track, idx) => (
-                                                <div key={idx} className="tracklist-item-with-rutube">
+                                                <div key={idx} className="tracklist-item-simple">
                                                     <div className="tracklist-item-main">
                                                         <span className="track-num">{track.position || idx + 1}</span>
                                                         <span className="track-name">{track.title}</span>
@@ -459,7 +502,7 @@ function AddVinylPage() {
                                                                 <span className="yandex-found" title="Найдено на Яндекс.Музыке">✅</span>
                                                             </>
                                                         ) : (
-                                                            <span className="yandex-not-found" title="Не найдено на Яндекс.Музыке">❌</span>
+                                                            <span className="yandex-not-found" title="Не найдено на Яндекс.Музыке"></span>
                                                         )}
 
                                                         {/* Кнопка поиска на RuTube */}
@@ -473,54 +516,41 @@ function AddVinylPage() {
                                                         </button>
                                                     </div>
 
-                                                    {/* Информация о найденном треке на Яндекс.Музыке */}
-                                                    {yandexTracks[idx] && (
-                                                        <div className="yandex-track-info">
-                                                            {yandexTracks[idx].coverUrl && (
-                                                                <img
-                                                                    src={yandexTracks[idx].coverUrl}
-                                                                    alt={yandexTracks[idx].title}
-                                                                    className="yandex-track-cover"
-                                                                />
-                                                            )}
-                                                            <div className="yandex-track-details">
-                                                                <div className="yandex-track-title">{yandexTracks[idx].title}</div>
-                                                                <div className="yandex-track-artist">{yandexTracks[idx].artist}</div>
-                                                                {yandexTracks[idx].album && (
-                                                                    <div className="yandex-track-album">{yandexTracks[idx].album}</div>
-                                                                )}
-                                                                {!yandexTracks[idx].previewUrl && (
-                                                                    <div className="yandex-no-preview">⚠️ Нет отрывка для прослушивания</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Если трек не найден на Яндекс.Музыке */}
-                                                    {!searchingYandex[idx] && !yandexTracks[idx] && (
-                                                        <div className="yandex-track-notfound">
-                                                            <span>❌ Не найдено на Яндекс.Музыке</span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Результаты поиска на RuTube */}
-                                                    {/* Результаты поиска на RuTube */}
+                                                    {/* Результаты поиска на RuTube - без лишних надписей и фото */}
                                                     {rutubeResults[idx] && rutubeResults[idx].length > 0 && (
                                                         <div className="rutube-results">
-                                                            <div className="rutube-results-header">📺 Найдено на RuTube:</div>
-                                                            {/* Показываем только первый (самый релевантный) результат */}
-                                                            <div
-                                                                className="rutube-video-item"
-                                                                onClick={() => openRuTubeVideo(rutubeResults[idx][0])}
-                                                            >
-                                                                <img src={rutubeResults[idx][0].thumbnailUrl} alt={rutubeResults[idx][0].title} />
-                                                                <div className="rutube-video-info">
-                                                                    <div className="rutube-video-title">{rutubeResults[idx][0].title}</div>
-                                                                </div>
+                                                            <div className="rutube-results-header">
+                                                                <span>📺 Найдено на RuTube:</span>
+                                                                <button
+                                                                    className="rutube-clear-results"
+                                                                    onClick={() => {
+                                                                        setRuTubeResults(prev => ({ ...prev, [idx]: [] }));
+                                                                    }}
+                                                                    title="Закрыть результаты"
+                                                                >
+                                                                    ✕
+                                                                </button>
                                                             </div>
+                                                            {rutubeResults[idx].slice(0, 1).map((video, vidIdx) => (
+                                                                <div
+                                                                    key={vidIdx}
+                                                                    className="rutube-video-item"
+                                                                    onClick={() => openRuTubeVideo(video)}
+                                                                >
+                                                                    <img
+                                                                        src={video.thumbnailUrl}
+                                                                        alt={video.title}
+                                                                        className="rutube-video-thumbnail"
+                                                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                                                    />
+                                                                    <div className="rutube-video-info">
+                                                                        <div className="rutube-video-title">{video.title}</div>
+                                                                        <div className="rutube-video-channel">{video.author}</div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
-
                                                 </div>
                                             ))}
                                         </div>

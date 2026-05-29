@@ -83,37 +83,10 @@ function AddVinyl() {
         setPhotoPreviews([...photoPreviews, ...newPreviews]);
     };
 
-    const handleAddToCollection = async () => {
-        if (!selectedVinyl) return;
-
-        setUploading(true);
-
-        const vinylWithDetails = {
-            ...selectedVinyl,
-            tracklist: tracklist,
-            userComment: comment,
-            userRating: rating,
-            addedDate: new Date().toISOString(),
-            userPhotos: photoPreviews
-        };
-
-        const added = addToCollection(vinylWithDetails);
-
-        if (added) {
-            alert(`✅ "${selectedVinyl.title}" добавлена в коллекцию с оценкой ${rating}★!`);
-            setShowDetails(false);
-            setSelectedVinyl(null);
-            setTracklist([]);
-            setComment('');
-            setRating(0);
-            setPhotos([]);
-            setPhotoPreviews([]);
-            navigate('/collection');
-        } else {
-            alert(`❌ "${selectedVinyl.title}" уже есть в коллекции`);
-        }
-
-        setUploading(false);
+    const handleAddToCollection = (vinyl) => {
+        addToCollection(vinyl);
+        // Обновляем отображение
+        loadCollection();
     };
 
     return (
