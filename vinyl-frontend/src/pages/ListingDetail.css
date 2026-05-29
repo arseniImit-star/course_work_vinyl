@@ -1,0 +1,371 @@
+/* ListingDetail.css */
+.listing-detail-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f0e8 0%, #e8e0d5 100%);
+    padding: 40px 20px;
+}
+
+.listing-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.back-btn {
+    background: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 30px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.back-btn:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Detail Card */
+.detail-card {
+    background: white;
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+}
+
+.detail-header {
+    padding: 20px 30px 0;
+}
+
+.listing-type-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 50px;
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.detail-content {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 40px;
+    padding: 30px;
+}
+
+.detail-image img {
+    width: 100%;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.detail-info h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+}
+
+.detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 20px;
+}
+
+.detail-meta span {
+    font-size: 14px;
+    color: #666;
+}
+
+.detail-meta .price {
+    color: #28a745;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.detail-meta .desired {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.detail-description h3,
+.detail-vinyl-info h3,
+.seller-section h3,
+.comments-section h3 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #1a1a2e;
+}
+
+.detail-description p {
+    color: #666;
+    line-height: 1.6;
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 16px;
+}
+
+.vinyl-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 16px;
+}
+
+.vinyl-info-grid div {
+    font-size: 14px;
+    color: #666;
+}
+
+.vinyl-info-grid strong {
+    color: #333;
+}
+
+/* Seller Section */
+.seller-section {
+    margin-top: 30px;
+}
+
+.seller-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 20px;
+    flex-wrap: wrap;
+}
+
+.seller-avatar-large {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.seller-avatar-large img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.seller-details {
+    flex: 1;
+}
+
+.seller-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+}
+
+.view-profile-btn {
+    padding: 6px 16px;
+    background: transparent;
+    border: 1px solid #ff6b6b;
+    border-radius: 50px;
+    color: #ff6b6b;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.view-profile-btn:hover {
+    background: #ff6b6b;
+    color: white;
+}
+
+.message-seller-btn {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.message-seller-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
+/* Comments Section */
+.comments-section {
+    background: white;
+    border-radius: 30px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.add-comment-form {
+    margin-bottom: 30px;
+}
+
+.add-comment-form textarea {
+    width: 100%;
+    padding: 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    margin-bottom: 12px;
+}
+
+.add-comment-form textarea:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+.add-comment-form button {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-comment-form button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.add-comment-form button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.login-to-comment {
+    text-align: center;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 16px;
+    margin-bottom: 30px;
+}
+
+.login-to-comment a {
+    color: #ff6b6b;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.comments-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.comment-item {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.comment-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.comment-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.comment-content {
+    flex: 1;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.comment-author a {
+    font-weight: 700;
+    color: #1a1a2e;
+    text-decoration: none;
+}
+
+.comment-author a:hover {
+    color: #ff6b6b;
+}
+
+.comment-date {
+    font-size: 11px;
+    color: #999;
+}
+
+.comment-text {
+    color: #666;
+    line-height: 1.5;
+}
+
+.no-comments {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .detail-content {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        padding: 20px;
+    }
+
+    .detail-info h1 {
+        font-size: 22px;
+    }
+
+    .seller-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .vinyl-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .comment-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .listing-detail-page {
+        padding: 20px 16px;
+    }
+}

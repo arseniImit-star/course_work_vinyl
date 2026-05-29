@@ -1,0 +1,127 @@
+.cart-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.cart-empty {
+    text-align: center;
+    padding: 60px;
+}
+
+.cart-items {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.cart-item {
+    display: grid;
+    grid-template-columns: 80px 1fr auto auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.cart-item-image img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.cart-item-info h3 {
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.cart-item-info p {
+    color: #666;
+    font-size: 14px;
+}
+
+.cart-item-price {
+    font-weight: bold;
+    color: #764ba2;
+}
+
+.cart-item-quantity input {
+    width: 60px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.cart-item-remove button {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #999;
+}
+
+.cart-item-remove button:hover {
+    color: #dc3545;
+}
+
+.cart-summary {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.cart-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+}
+
+.clear-cart-btn {
+    padding: 12px 24px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.checkout-btn {
+    padding: 12px 32px;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .cart-item {
+        grid-template-columns: 60px 1fr;
+        gap: 12px;
+    }
+
+    .cart-item-price,
+    .cart-item-quantity,
+    .cart-item-remove {
+        grid-column: span 2;
+        justify-self: start;
+    }
+}
